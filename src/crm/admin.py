@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from crm.models import Clients, Events, Contracts
+from crm.models import Clients, Events, Contracts, EventStatus
 
 
 @admin.register(Clients)
@@ -16,4 +16,9 @@ class EventsAdmin(admin.ModelAdmin):
 
 @admin.register(Contracts)
 class ContractsAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(EventStatus)
+class EventStatusAdmin(admin.ModelAdmin):
     pass

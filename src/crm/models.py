@@ -31,6 +31,14 @@ class Clients(models.Model):
         return self.compagny_name
 
 
+class EventStatus(models.Model):
+    """Défini le statut de chaque évènement"""
+    status = models.CharField(max_length=25, verbose_name="Statut")
+
+    class Meta:
+        verbose_name = "Statut evènement"
+
+
 class Events(models.Model):
     """Stocke toutes les informations concernant chaque évènement lié à un client """
     client = models.ForeignKey(to=Clients, on_delete=models.SET_NULL, null=True,
@@ -40,9 +48,8 @@ class Events(models.Model):
     # avec auto_now, la date est mise à jour à chaque modification
     date_updated = models.DateTimeField(auto_now=True)
     suport_contact = models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-                                       null=True, related_name='Support')
-    # Statut de l'évenemment en cours = False, réalisé = True
-    event_status = models.BooleanField(default=False, verbose_name="Réalisé")
+                                       null=True, related_name='Support', blank=True)
+    event_status = models.ForeignKey(to=EventStatus, on_delete=models.SET_NULL, null=True, blank=True)
     attendees = models.IntegerField(blank=True, verbose_name="Participants")
     # Date quand se déroule mise à jour manuellement
     # (pour une date, si blank=True alors null=True nécessaire)
@@ -60,6 +67,8 @@ class Contracts(models.Model):
                                       null=True, blank=True)
     client = models.ForeignKey(to=Clients, on_delete=models.SET_NULL, null=True,
                                related_name='Clientcontracts')
+    event = models.OneToOneField(to=Events, on_delete=models.SET_NULL, null=True,
+                                 related_name='AttachedEvent')
     # avec auto_now_add, la date n'est actualisée qu'à la création
     date_created = models.DateTimeField(auto_now_add=True)
     # avec auto_now, la date est mise à jour à chaque modification
