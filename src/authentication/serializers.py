@@ -28,9 +28,9 @@ class UsersSerializer(ModelSerializer):
             first_name=self.validated_data['first_name'],
             last_name=self.validated_data['last_name'],
             email=self.validated_data['email'],
-            # is_sales=self.validated_data['is_sales'],
-            # is_support=self.validated_data['is_support'],
-            # is_management=self.validated_data['is_management'],
+            is_sales=self.validated_data['is_sales'],
+            is_support=self.validated_data['is_support'],
+            is_management=self.validated_data['is_management'],
         )
         user.set_password(self.validated_data['password'])
         print('datas = ', self.validated_data)
