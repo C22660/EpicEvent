@@ -25,17 +25,16 @@ class ContractsSerializer(ModelSerializer):
 
     class Meta:
         model = Contracts
-        fields = ['sales_contact', 'client', 'date_created', 'date_update', 'status', 'amount',
+        fields = ['sales_contact', 'client', 'date_created', 'date_updated', 'status', 'amount',
                   'payment_due']
 
-    def create(self, client=None, sales_contact=None):
-
+    # def create(self, client=None, sales_contact=None):
+    def create(self, client=None):
+        print('self datas = ', self.validated_data)
         contract = Contracts(
-            sales_contact=sales_contact,
+            # sales_contact=sales_contact,
+            sales_contact=self.validated_data['sales_contact'],
             client=client,
-            date_created=self.validated_data['date_created'],
-            date_update=self.validated_data['date_update'],
-            status=self.validated_data['status'],
             amount=self.validated_data['amount'],
             payment_due=self.validated_data['payment_due'],
         )
@@ -56,16 +55,12 @@ class EventsSerializer(ModelSerializer):
         fields = ['client', 'date_created', 'date_updated', 'support_contact', 'event_status',
                   'attendees', 'event_date', 'note', 'contract']
 
-    def create(self, contract_concerned=None):
+    def create(self, client=None, contract_concerned=None):
 
         event = Events(
             contract=contract_concerned,
-            client=self.validated_data['client'],
-            date_created=self.validated_data['date_created'],
-            date_updated=self.validated_data['date_updated'],
-            support_contact=self.validated_data['support_contact'],
+            client=client,
             event_status=self.validated_data['event_status'],
-            attendees=self.validated_data['attendees'],
             event_date=self.validated_data['event_date'],
             note=self.validated_data['note'],
         )
@@ -76,3 +71,14 @@ class EventsSerializer(ModelSerializer):
         event_serialized = EventsSerializer(instance=event).data
 
         return event_serialized
+
+    # Vu que l'ajout du contact support implique un user object et non juste son ID,
+    # mise en place d'une def update en lieu et place de celle qui existe par défaut
+    def update(self, instance, validated_data, support_contact=None):
+        print("instance = ", instance)
+        print("print validated_data = ", validated_data)
+        # if validated_data.get("support_contact") is not None:
+        if support_contact is not None:
+            instance.support_contact = support_contact
+            # instance.support_contact=validated_data.get("support_contact", support_contact)
+        return instance

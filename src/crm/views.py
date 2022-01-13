@@ -6,7 +6,9 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 
 from crm.models import Clients, Contracts, Events
+from authentication.models import Users
 from crm.serializers import ClientsDetailSerializer, ContractsSerializer, EventsSerializer
+from crm.permissions import ClientsPermissions, ContractsPermissions, EventsPermissions
 
 # ContractsSerializer, EventsSerializer
 # from crm.permissions import
@@ -17,8 +19,7 @@ from crm.serializers import ClientsDetailSerializer, ContractsSerializer, Events
 
 class ClientsViewset(ModelViewSet):
 
-    # permission_classes = [IsAuthenticated, ProjectIsUserAuthorOrContributorPermissions]
-    #
+    permission_classes = [IsAuthenticated, ClientsPermissions]
     serializer_class = ClientsDetailSerializer
 
     def get_queryset(self):
@@ -42,11 +43,15 @@ class ClientsViewset(ModelViewSet):
         return Response({"message": "Le client et ses contrats associés ont bien été supprimés."},
                         status=200)
 
+    # Implémente le request User en sales_contact
+    def perform_create(self, serializer):
+        serializer.save(sales_contact=self.request.user)
+
+
 # -------------------------------C O N T R A C T S -------------------------------------
 
     # GET: /clients/{id}/contracts/
-    # @action(detail=True, methods=['get', 'post'], permission_classes=[IssuesPermissions])
-    @action(detail=True, methods=['get', 'post'])
+    @action(detail=True, methods=['get', 'post'], permission_classes=[ContractsPermissions])
     def contracts(self, request, pk=None):
         """Création d'un path /clients/<id>/contracts pour afficher les contrats d'un client,
         et en enregistrer de nouveaux """
@@ -58,7 +63,7 @@ class ClientsViewset(ModelViewSet):
                 return HttpResponse({"Aucun contrat pour ce client, ou client inexistant."},
                                     status=404)
 
-            # self.check_object_permissions(request, Clients.objects.get(pk=pk))
+            self.check_object_permissions(request, Clients.objects.get(pk=pk))
             serializer = ContractsSerializer(queryset, many=True)
             return Response(serializer.data, status=200)
 
@@ -80,9 +85,12 @@ class ClientsViewset(ModelViewSet):
                 # Vérification des permissions
                 # PERMISSIONS !!!!!!!!!!
                 # self.check_object_permissions(request, Clients.objects.get(pk=pk))
+                # Ici, passage de obj à la permission via Clients.objects.get(pk=pk)
+                self.check_object_permissions(request, Clients.objects.get(pk=pk))
                 # Enregistrement du contrat par le serializer en lui adressant le client récupéré
                 # dans le try précédent, grace au pk de l'url et l'auteur via request.user
-                contract = serializer.create(client=client, sales_contact=request.user)
+                # contract = serializer.create(client=client, sales_contact=request.user)
+                contract = serializer.create(client=client)
                 return Response(contract, status=200)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -91,9 +99,9 @@ class ClientsViewset(ModelViewSet):
         # le nom de la fonction mais remplacé par url_path. Comme pk, issue_id devient
         # récupérable
         # ------------------------------------------------------------------------------ #
-    # @action(detail=True, methods=['put', 'delete'], url_path='clients/(?P<contract_id>\d+)',
-    #         permission_classes=[ContractPermissions])
-    @action(detail=True, methods=['put', 'delete'], url_path='clients/(?P<contract_id>\d+)')
+    @action(detail=True, methods=['put', 'delete'], url_path='contracts/(?P<contract_id>\d+)',
+            permission_classes=[ContractsPermissions])
+    # @action(detail=True, methods=['put', 'delete'], url_path='contracts/(?P<contract_id>\d+)')
     def update_or_delete_contract(self, request, contract_id, pk=None):
         """Création d'un path /clients/<id>/contracts/<id> pour mettre à jour un contrat,
         ou le supprimer"""
@@ -115,7 +123,7 @@ class ClientsViewset(ModelViewSet):
             serializer = ContractsSerializer(partial=True)
             # Pas de création d'un update dans le serializers.py car utilisation de update()
             # Vérification des permissions
-            # self.check_object_permissions(request, Projects.objects.get(pk=pk))
+            self.check_object_permissions(request, Clients.objects.get(pk=pk))
             contract_modified = serializer.update(instance=contract_concerned.first(),
                                                   validated_data=request.data)
 
@@ -126,7 +134,7 @@ class ClientsViewset(ModelViewSet):
 
         if request.method == "DELETE":
             # Vérification des permissions
-            # self.check_object_permissions(request, Projects.objects.get(pk=pk))
+            self.check_object_permissions(request, Clients.objects.get(pk=pk))
             # si permission, suppression du problème :
             contract_concerned.delete()
 
@@ -139,15 +147,15 @@ class ClientsViewset(ModelViewSet):
         # ici, l'url n'est pas le nom de la fonction mais remplacé par url_path.
         # Comme pk, issue_id devient récupérable
         # ------------------------------------------------------------------------------ #
-    # @action(detail=True, methods=['post', 'get'],
-    #         url_path='contracts/(?P<contract_id>\d+)/events', permission_classes=[EventsPermissions])
-    @action(detail=True, methods=['post', 'get'], url_path='contracts/(?P<contract_id>\d+)/events')
+    @action(detail=True, methods=['post', 'get'],
+            url_path='contracts/(?P<contract_id>\d+)/events', permission_classes=[EventsPermissions])
+    # @action(detail=True, methods=['post', 'get'], url_path='contracts/(?P<contract_id>\d+)/events')
     def events(self, request, contract_id, pk=None):
         """Création d'un path /cleints/<id>/contracts/<id>/events pour créer, récupérer
          un évènnement"""
         # Vérification que le client existe
         try:
-            Clients.objects.get(pk=pk)
+            client = Clients.objects.get(pk=pk)
         except Clients.DoesNotExist:
             return HttpResponse({f"Le client {pk} n'existe pas."}, status=404)
 
@@ -167,39 +175,36 @@ class ClientsViewset(ModelViewSet):
             if serializer.is_valid():
                 # Si Informations partielles validées :
                 # Vérification des permissions
-                # self.check_object_permissions(request, Projects.objects.get(pk=pk))
+                self.check_object_permissions(request, Clients.objects.get(pk=pk))
                 # Enregistrement de l'évènement par le serializer en lui adressant le
                 # contrat concerné dans le try précédent, grace au contract_id de l'url
                 # !!! si, contract_concerned récupéré avec filter et non get,
                 # il faut ajouter .first() car il s'agit alors d'un queryset et non plus
                 # d'une instance avec get contract_concerned = Contracts.objects.get(pk=contract_id)
-                event = serializer.create(contract_concerned=contract_concerned.first())
+                event = serializer.create(client=client, contract_concerned=contract_concerned.first())
                 return Response(event, status=200)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         # Récupérer les évènements d'un contrat
         if request.method == 'GET':
             # Vérification des permissions
-            # self.check_object_permissions(request, Clients.objects.get(pk=pk))
+            self.check_object_permissions(request, Clients.objects.get(pk=pk))
             # récupération des &vènements liés à un contrat
             event_for_contract = Events.objects.filter(contract=contract_id)
-            # datas = []
-            # for comment in all_comments_for_issue:
-            #     serializer = CommentsSerializer(comment)
-            #     datas.append(serializer.data)
+            serializer = EventsSerializer(event_for_contract, many=True)
 
-            return Response(event_for_contract, status=200)
+            return Response(serializer.data, status=200)
 
         # ------------------------------------------------------------------------------ #
         # Via @action, création de l'url : /clients/{id}/contracts/{id}/events/{id}
         # ici, l'url n'est pas le nom de la fonction mais remplacé par url_path.
         # Comme pk, contract_id et event_id deviennent récupérables
         # ------------------------------------------------------------------------------ #
-    # @action(detail=True, methods=['get', 'put', 'delete'],
-    #         url_path='contracts/(?P<contract_id>\d+)/events/(?P<event_id>\d+)',
-    #         permission_classes=[EventsPermissions])
     @action(detail=True, methods=['get', 'put', 'delete'],
-            url_path='contracts/(?P<contract_id>\d+)/events/(?P<event_id>\d+)')
+            url_path='contracts/(?P<contract_id>\d+)/events/(?P<event_id>\d+)',
+            permission_classes=[EventsPermissions])
+    # @action(detail=True, methods=['get', 'put', 'delete'],
+    #         url_path='contracts/(?P<contract_id>\d+)/events/(?P<event_id>\d+)')
     def update_or_delete_or_get_event(self, request, contract_id, event_id, pk=None):
         """Création d'un path /clients/<id>/contract/<id>/event/<id> pour créer, récupérer,
         modifier, supprimer un évènement"""
@@ -229,11 +234,15 @@ class ClientsViewset(ModelViewSet):
         if request.method == "PUT":
             # Vérification des permissions
             # self.check_object_permissions(request, Clients.objects.get(pk=pk))
+            self.check_object_permissions(request, Events.objects.get(pk=event_id))
+            pk_contact = request.data.get("support_contact")
+            contact = Users.objects.get(pk=pk_contact)
             serializer = EventsSerializer(partial=True)
-
-            # Pas de création d'un update dans le serializers.py car utilisation de update()
+            # Re création d'un update dans le serializers.py car ajout de support_contact
+            # sous forme d'object et non de dict de request.data
             event_modified = serializer.update(instance=event_concerned.first(),
-                                                 validated_data=request.data)
+                                               validated_data=request.data,
+                                               support_contact=contact)
 
             # reserialization de comment_modified pour passage en Response
             event_serialized = EventsSerializer(instance=event_modified).data
@@ -243,6 +252,7 @@ class ClientsViewset(ModelViewSet):
         if request.method == "DELETE":
             # Vérification des permissions
             # self.check_object_permissions(request, Clients.objects.get(pk=pk))
+            self.check_object_permissions(request, Events.objects.get(pk=event_id))
             event_concerned.delete()
 
             return Response({"message": "L'évènement' a bien été supprimé."}, status=200)
@@ -251,6 +261,7 @@ class ClientsViewset(ModelViewSet):
         if request.method == "GET":
             # Vérification des permissions
             # self.check_object_permissions(request, Clients.objects.get(pk=pk))
+            self.check_object_permissions(request, Events.objects.get(pk=event_id))
             # reserialization de comment_modified pour passage en Response
             event_find = EventsSerializer(instance=event_concerned.first()).data
             return Response(event_find, status=200)
