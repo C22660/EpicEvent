@@ -1,14 +1,16 @@
 from django.http import Http404, HttpResponse
-from rest_framework import status
+from rest_framework import status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
+from django_filters import rest_framework as filters
 
-from crm.models import Clients, Contracts, Events
+from crm.models import Clients, Contracts, Events, EventStatus
 from authentication.models import Users
 from crm.serializers import ClientsDetailSerializer, ContractsSerializer, EventsSerializer
 from crm.permissions import ClientsPermissions, ContractsPermissions, EventsPermissions
+from crm.filters import ContractsFilterSet, EventsFilterSet
 
 # ContractsSerializer, EventsSerializer
 # from crm.permissions import
@@ -27,7 +29,20 @@ class ClientsViewset(ModelViewSet):
         # si l'url est /api/clients/2/, alors self.kwargs = {'pk': '2'}
         # Si je veux le détail d'un client, je retourne toutes les valeurs à la permission
         # (l'affichage du détail étant géré par modelVieSet)
-        return Clients.objects.all()
+        # Intégration de la recherche dans l'url :
+        queryset = Clients.objects.all()
+        client_name = self.request.query_params.get('client_name')
+        client_email = self.request.query_params.get('client_email')
+        compagny_name = self.request.query_params.get('compagny_name')
+        if client_name is not None:
+            queryset = queryset.filter(last_name=client_name)
+        elif client_email is not None:
+            queryset = queryset.filter(email=client_email)
+        elif compagny_name is not None:
+            queryset = queryset.filter(compagny_name=compagny_name)
+
+        # et si pas de recherche dans l'URL, retour direct du queryset
+        return queryset
 
     # Pour pouvoir faire un update partiel
     # https://tech.serhatteker.com/post/2020-09/enable-partial-update-drf/
@@ -64,6 +79,23 @@ class ClientsViewset(ModelViewSet):
                                     status=404)
 
             self.check_object_permissions(request, Clients.objects.get(pk=pk))
+            # client_name = self.request.query_params.get('client_name')
+            # client_email = self.request.query_params.get('client_email')
+            date_contract = self.request.query_params.get('date_contract')
+            amount = self.request.query_params.get('amount')
+            # if client_name is not None:
+            #     queryset = queryset.filter(client__last_name=client_name)
+            # elif client_email is not None:
+            #     queryset = queryset.filter(client__email=client_email)
+            if date_contract is not None:
+                # Transformation de la date 2022-01-11 sous forme d'une liste ['2022', '01', '11']
+                date_split = date_contract.split("-")
+                queryset = queryset.filter(date_created__year=date_split[0],
+                                           date_created__month=date_split[1],
+                                           date_created__day=date_split[2])
+            elif amount is not None:
+                queryset = queryset.filter(amount=amount)
+
             serializer = ContractsSerializer(queryset, many=True)
             return Response(serializer.data, status=200)
 
@@ -188,7 +220,8 @@ class ClientsViewset(ModelViewSet):
         # Récupérer les évènements d'un contrat
         if request.method == 'GET':
             # Vérification des permissions
-            self.check_object_permissions(request, Clients.objects.get(pk=pk))
+            # self.check_object_permissions(request, Clients.objects.get(pk=pk))
+            self.check_object_permissions(request, Events.objects.filter(contract=contract_id).filter(client=pk))
             # récupération des &vènements liés à un contrat
             event_for_contract = Events.objects.filter(contract=contract_id)
             serializer = EventsSerializer(event_for_contract, many=True)
@@ -235,18 +268,49 @@ class ClientsViewset(ModelViewSet):
             # Vérification des permissions
             # self.check_object_permissions(request, Clients.objects.get(pk=pk))
             self.check_object_permissions(request, Events.objects.get(pk=event_id))
+            # Si la requête souhaite modifier le contact support, l'ID collecté dans la
+            # request Data doit être convertie en users.object
             pk_contact = request.data.get("support_contact")
-            contact = Users.objects.get(pk=pk_contact)
-            serializer = EventsSerializer(partial=True)
-            # Re création d'un update dans le serializers.py car ajout de support_contact
-            # sous forme d'object et non de dict de request.data
-            event_modified = serializer.update(instance=event_concerned.first(),
-                                               validated_data=request.data,
-                                               support_contact=contact)
+            pk_event_status = request.data.get("event_status")
+            if pk_contact is not None and pk_event_status is None:
+                contact = Users.objects.get(pk=pk_contact)
+                serializer = EventsSerializer(data=request.data, partial=True)
+                if serializer.is_valid():
+                    # Re création d'un update dans le serializers.py car ajout de support_contact
+                    # sous forme d'object et non de dict de request.data
+                    event_modified = serializer.update(instance=event_concerned.first(),
+                                                       validated_data=request.data,
+                                                       support_contact=contact)
+            elif pk_contact is None and pk_event_status is not None:
+                ev_status = EventStatus.objects.get(pk=pk_event_status)
+                serializer = EventsSerializer(data=request.data, partial=True)
+                if serializer.is_valid():
+                    # Re création d'un update dans le serializers.py car ajout de support_contact
+                    # sous forme d'object et non de dict de request.data
+                    event_modified = serializer.update(instance=event_concerned.first(),
+                                                       validated_data=request.data,
+                                                       event_status=ev_status)
+            elif pk_contact is not None and pk_event_status is not None:
+                contact = Users.objects.get(pk=pk_contact)
+                ev_status = EventStatus.objects.get(pk=pk_event_status)
+                serializer = EventsSerializer(data=request.data, partial=True)
+                if serializer.is_valid():
+                    # Re création d'un update dans le serializers.py car ajout de support_contact
+                    # sous forme d'object et non de dict de request.data
+                    event_modified = serializer.update(instance=event_concerned.first(),
+                                                       validated_data=request.data,
+                                                       support_contact=contact,
+                                                       event_status=ev_status)
+            else:
+                serializer = EventsSerializer(data=request.data, partial=True)
+                # Re création d'un update dans le serializers.py car ajout de support_contact
+                # sous forme d'object et non de dict de request.data
+                if serializer.is_valid():
+                    event_modified = serializer.update(instance=event_concerned.first(),
+                                                       validated_data=request.data)
 
             # reserialization de comment_modified pour passage en Response
             event_serialized = EventsSerializer(instance=event_modified).data
-
             return Response(event_serialized, status=200)
 
         if request.method == "DELETE":
@@ -266,3 +330,39 @@ class ClientsViewset(ModelViewSet):
             event_find = EventsSerializer(instance=event_concerned.first()).data
             return Response(event_find, status=200)
 
+#----------------------------------------------------------------------#
+#                      Gestion de la recherche                        -#
+#               au niveau de api/contracts et api/clients             -#
+#       celle de api/clients gérée au sein du def get_queryset de     -#
+#                   la class ClientsViewset(ModelViewSet)             -#
+# ---------------------------------------------------------------------#
+
+
+class ContractsListView(generics.ListAPIView):
+    """
+    Classe utlisée pour permettre les recherches au niveau
+    de la route api/contracts
+    """
+    permission_classes = [IsAuthenticated]
+
+    http_method_names = ['get']
+    queryset = Contracts.objects.all()
+    serializer_class = ContractsSerializer
+    filter_backends = [filters.DjangoFilterBackend]
+    # filterset_fields = ['client__last_name', 'client__compagny_name', 'client__email',
+    #                     'date_created', 'amount']
+    filterset_class = ContractsFilterSet
+
+
+class EventsListView(generics.ListAPIView):
+    """
+    Classe utlisée pour permettre les recherches au niveau
+    de la route api/events
+    """
+    permission_classes = [IsAuthenticated]
+
+    http_method_names = ['get']
+    queryset = Events.objects.all()
+    serializer_class = EventsSerializer
+    filter_backends = [filters.DjangoFilterBackend]
+    filterset_class = EventsFilterSet
