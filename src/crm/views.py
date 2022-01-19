@@ -1,4 +1,4 @@
-from django.http import Http404, HttpResponse
+from django.http import HttpResponse
 from rest_framework import status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -33,13 +33,13 @@ class ClientsViewset(ModelViewSet):
         queryset = Clients.objects.all()
         client_name = self.request.query_params.get('client_name')
         client_email = self.request.query_params.get('client_email')
-        compagny_name = self.request.query_params.get('compagny_name')
+        client_contact = self.request.query_params.get('client_contact')
         if client_name is not None:
-            queryset = queryset.filter(last_name=client_name)
+            queryset = queryset.filter(compagny_name__icontains=client_name)
         elif client_email is not None:
-            queryset = queryset.filter(email=client_email)
-        elif compagny_name is not None:
-            queryset = queryset.filter(compagny_name=compagny_name)
+            queryset = queryset.filter(email__icontains=client_email)
+        elif client_contact is not None:
+            queryset = queryset.filter(last_name__icontains=client_contact)
 
         # et si pas de recherche dans l'URL, retour direct du queryset
         return queryset
@@ -64,7 +64,6 @@ class ClientsViewset(ModelViewSet):
 
 
 # -------------------------------C O N T R A C T S -------------------------------------
-
     # GET: /clients/{id}/contracts/
     @action(detail=True, methods=['get', 'post'], permission_classes=[ContractsPermissions])
     def contracts(self, request, pk=None):
@@ -99,7 +98,6 @@ class ClientsViewset(ModelViewSet):
             serializer = ContractsSerializer(queryset, many=True)
             return Response(serializer.data, status=200)
 
-
         # Enregistrer un contrat pour un client
         if request.method == "POST":
             # Vérification que le client existe
@@ -120,22 +118,22 @@ class ClientsViewset(ModelViewSet):
                 # Ici, passage de obj à la permission via Clients.objects.get(pk=pk)
                 self.check_object_permissions(request, Clients.objects.get(pk=pk))
                 # Enregistrement du contrat par le serializer en lui adressant le client récupéré
-                # dans le try précédent, grace au pk de l'url et l'auteur via request.user
+                # dans le try précédent, grace au pk de l'url et l'auteur via "request.user"
                 # contract = serializer.create(client=client, sales_contact=request.user)
-                contract = serializer.create(client=client)
+                contract = serializer.create(client=client, sales_contact=request.user)
                 return Response(contract, status=200)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         # ------------------------------------------------------------------------------ #
         # Via @action, création de l'url : /clients/{id}/contracts/{id}/ ici, l'url n'est pas
-        # le nom de la fonction mais remplacé par url_path. Comme pk, issue_id devient
+        # le nom de la fonction, mais remplacé par url_path. Comme pk, issue_id devient
         # récupérable
         # ------------------------------------------------------------------------------ #
     @action(detail=True, methods=['put', 'delete'], url_path='contracts/(?P<contract_id>\d+)',
             permission_classes=[ContractsPermissions])
     # @action(detail=True, methods=['put', 'delete'], url_path='contracts/(?P<contract_id>\d+)')
     def update_or_delete_contract(self, request, contract_id, pk=None):
-        """Création d'un path /clients/<id>/contracts/<id> pour mettre à jour un contrat,
+        """Création d'un path /clients/<id>/contracts/<id> pour mettre à jour un contrat
         ou le supprimer"""
         # Vérification que le projet existe
         try:
@@ -153,7 +151,7 @@ class ClientsViewset(ModelViewSet):
 
         if request.method == "PUT":
             serializer = ContractsSerializer(partial=True)
-            # Pas de création d'un update dans le serializers.py car utilisation de update()
+            # Pas de création d'un update dans le serializers.py car utilisation d'update()
             # Vérification des permissions
             self.check_object_permissions(request, Clients.objects.get(pk=pk))
             contract_modified = serializer.update(instance=contract_concerned.first(),
@@ -176,12 +174,12 @@ class ClientsViewset(ModelViewSet):
 
         # ------------------------------------------------------------------------------ #
         # Via @action, création de l'url : /clients/{id}/contracts/{id}/events/
-        # ici, l'url n'est pas le nom de la fonction mais remplacé par url_path.
+        # ici, l'url n'est pas le nom de la fonction, mais remplacé par url_path.
         # Comme pk, issue_id devient récupérable
         # ------------------------------------------------------------------------------ #
     @action(detail=True, methods=['post', 'get'],
-            url_path='contracts/(?P<contract_id>\d+)/events', permission_classes=[EventsPermissions])
-    # @action(detail=True, methods=['post', 'get'], url_path='contracts/(?P<contract_id>\d+)/events')
+            url_path='contracts/(?P<contract_id>\d+)/events',
+            permission_classes=[EventsPermissions])
     def events(self, request, contract_id, pk=None):
         """Création d'un path /cleints/<id>/contracts/<id>/events pour créer, récupérer
          un évènnement"""
@@ -213,7 +211,8 @@ class ClientsViewset(ModelViewSet):
                 # !!! si, contract_concerned récupéré avec filter et non get,
                 # il faut ajouter .first() car il s'agit alors d'un queryset et non plus
                 # d'une instance avec get contract_concerned = Contracts.objects.get(pk=contract_id)
-                event = serializer.create(client=client, contract_concerned=contract_concerned.first())
+                event = serializer.create(client=client,
+                                          contract_concerned=contract_concerned.first())
                 return Response(event, status=200)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -221,7 +220,9 @@ class ClientsViewset(ModelViewSet):
         if request.method == 'GET':
             # Vérification des permissions
             # self.check_object_permissions(request, Clients.objects.get(pk=pk))
-            self.check_object_permissions(request, Events.objects.filter(contract=contract_id).filter(client=pk))
+            self.check_object_permissions(request,
+                                          Events.objects.filter(contract=contract_id).filter(
+                                              client=pk))
             # récupération des &vènements liés à un contrat
             event_for_contract = Events.objects.filter(contract=contract_id)
             serializer = EventsSerializer(event_for_contract, many=True)
@@ -230,7 +231,7 @@ class ClientsViewset(ModelViewSet):
 
         # ------------------------------------------------------------------------------ #
         # Via @action, création de l'url : /clients/{id}/contracts/{id}/events/{id}
-        # ici, l'url n'est pas le nom de la fonction mais remplacé par url_path.
+        # ici, l'url n'est pas le nom de la fonction, mais remplacé par url_path.
         # Comme pk, contract_id et event_id deviennent récupérables
         # ------------------------------------------------------------------------------ #
     @action(detail=True, methods=['get', 'put', 'delete'],
@@ -276,8 +277,8 @@ class ClientsViewset(ModelViewSet):
                 contact = Users.objects.get(pk=pk_contact)
                 serializer = EventsSerializer(data=request.data, partial=True)
                 if serializer.is_valid():
-                    # Re création d'un update dans le serializers.py car ajout de support_contact
-                    # sous forme d'object et non de dict de request.data
+                    # Recréation d'un update dans le serializers.py car ajout de support_contact
+                    # sous forme d'object et non de dict de "request.data"
                     event_modified = serializer.update(instance=event_concerned.first(),
                                                        validated_data=request.data,
                                                        support_contact=contact)
@@ -285,8 +286,8 @@ class ClientsViewset(ModelViewSet):
                 ev_status = EventStatus.objects.get(pk=pk_event_status)
                 serializer = EventsSerializer(data=request.data, partial=True)
                 if serializer.is_valid():
-                    # Re création d'un update dans le serializers.py car ajout de support_contact
-                    # sous forme d'object et non de dict de request.data
+                    # Recréation d'un update dans le serializers.py car ajout de support_contact
+                    # sous forme d'object et non de dict de "request.data"
                     event_modified = serializer.update(instance=event_concerned.first(),
                                                        validated_data=request.data,
                                                        event_status=ev_status)
@@ -295,16 +296,16 @@ class ClientsViewset(ModelViewSet):
                 ev_status = EventStatus.objects.get(pk=pk_event_status)
                 serializer = EventsSerializer(data=request.data, partial=True)
                 if serializer.is_valid():
-                    # Re création d'un update dans le serializers.py car ajout de support_contact
-                    # sous forme d'object et non de dict de request.data
+                    # Recréation d'un update dans le serializers.py car ajout de support_contact
+                    # sous forme d'object et non de dict de "request.data"
                     event_modified = serializer.update(instance=event_concerned.first(),
                                                        validated_data=request.data,
                                                        support_contact=contact,
                                                        event_status=ev_status)
             else:
                 serializer = EventsSerializer(data=request.data, partial=True)
-                # Re création d'un update dans le serializers.py car ajout de support_contact
-                # sous forme d'object et non de dict de request.data
+                # Recréation d'un update dans le serializers.py car ajout de support_contact
+                # sous forme d'object et non de dict de "request.data"
                 if serializer.is_valid():
                     event_modified = serializer.update(instance=event_concerned.first(),
                                                        validated_data=request.data)
@@ -330,10 +331,11 @@ class ClientsViewset(ModelViewSet):
             event_find = EventsSerializer(instance=event_concerned.first()).data
             return Response(event_find, status=200)
 
-#----------------------------------------------------------------------#
+
+# ---------------------------------------------------------------------#
 #                      Gestion de la recherche                        -#
-#               au niveau de api/contracts et api/clients             -#
-#       celle de api/clients gérée au sein du def get_queryset de     -#
+#               au niveau de "api/contracts" et "api/events".         -#
+#       Celle de "api/clients" gérée au sein du def get_queryset de   -#
 #                   la class ClientsViewset(ModelViewSet)             -#
 # ---------------------------------------------------------------------#
 
@@ -343,14 +345,12 @@ class ContractsListView(generics.ListAPIView):
     Classe utlisée pour permettre les recherches au niveau
     de la route api/contracts
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ContractsPermissions]
 
     http_method_names = ['get']
     queryset = Contracts.objects.all()
     serializer_class = ContractsSerializer
     filter_backends = [filters.DjangoFilterBackend]
-    # filterset_fields = ['client__last_name', 'client__compagny_name', 'client__email',
-    #                     'date_created', 'amount']
     filterset_class = ContractsFilterSet
 
 
@@ -359,7 +359,7 @@ class EventsListView(generics.ListAPIView):
     Classe utlisée pour permettre les recherches au niveau
     de la route api/events
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, EventsPermissions]
 
     http_method_names = ['get']
     queryset = Events.objects.all()

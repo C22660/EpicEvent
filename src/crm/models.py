@@ -44,7 +44,8 @@ class Contracts(models.Model):
     date_updated = models.DateTimeField(auto_now=True)
     # Statut du contrat, non signé = False, signé = True
     status = models.BooleanField(default=False, verbose_name="Signé")
-    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, verbose_name="Montant")
+    amount = models.DecimalField(max_digits=10, decimal_places=2,
+                                 blank=True, verbose_name="Montant")
     # Date de limite de paiement
     # (pour une date, si blank=True alors null=True nécessaire)
     payment_due = models.DateField(blank=True, null=True)
@@ -76,8 +77,8 @@ class Events(models.Model):
     # avec auto_now, la date est mise à jour à chaque modification
     date_updated = models.DateTimeField(auto_now=True)
     support_contact = models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-                                       null=True, related_name='Support', blank=True,
-                                       limit_choices_to={'is_support': True})
+                                        null=True, related_name='Support', blank=True,
+                                        limit_choices_to={'is_support': True})
     event_status = models.ForeignKey(to=EventStatus, on_delete=models.SET_NULL, null=True,
                                      blank=True)
     attendees = models.IntegerField(blank=True, null=True, verbose_name="Participants")

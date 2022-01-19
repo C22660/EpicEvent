@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from crm.models import Clients, Contracts, Events
+from crm.models import Clients, Contracts, Events, EventStatus
 
 
 class ClientsDetailSerializer(ModelSerializer):
@@ -25,15 +25,15 @@ class ContractsSerializer(ModelSerializer):
 
     class Meta:
         model = Contracts
-        fields = ['sales_contact', 'client', 'date_created', 'date_updated', 'status', 'amount',
+        fields = ['id', 'sales_contact', 'client', 'date_created', 'date_updated', 'status', 'amount',
                   'payment_due']
 
     # def create(self, client=None, sales_contact=None):
-    def create(self, client=None):
+    def create(self, client=None, sales_contact=None):
         print('self datas = ', self.validated_data)
         contract = Contracts(
             # sales_contact=sales_contact,
-            sales_contact=self.validated_data['sales_contact'],
+            sales_contact=sales_contact,
             client=client,
             amount=self.validated_data['amount'],
             payment_due=self.validated_data['payment_due'],
@@ -52,7 +52,7 @@ class EventsSerializer(ModelSerializer):
 
     class Meta:
         model = Events
-        fields = ['client', 'date_created', 'date_updated', 'support_contact', 'event_status',
+        fields = ['id', 'client', 'date_created', 'date_updated', 'support_contact', 'event_status',
                   'attendees', 'event_date', 'note', 'contract']
 
     def create(self, client=None, contract_concerned=None):
@@ -74,11 +74,14 @@ class EventsSerializer(ModelSerializer):
 
     # Vu que l'ajout du contact support implique un user object et non juste son ID,
     # mise en place d'une def update en lieu et place de celle qui existe par défaut
-    def update(self, instance, validated_data, support_contact=None):
-        print("instance = ", instance)
-        print("print validated_data = ", validated_data)
-        # if validated_data.get("support_contact") is not None:
+    def update(self, instance, validated_data, support_contact=None, event_status=None):
         if support_contact is not None:
             instance.support_contact = support_contact
-            # instance.support_contact=validated_data.get("support_contact", support_contact)
+        if event_status is not None:
+            instance.event_status = event_status
+        if self.validated_data.get('event_date'):
+            instance.event_date = self.validated_data['event_date']
+        if self.validated_data.get('note'):
+            instance.note = self.validated_data['note']
+        instance.save()
         return instance
