@@ -1,0 +1,47 @@
+{% extends 'admin/base.html' %}
+{% load static %}
+
+{% block branding %}
+    <h1>CRM Epic Event</h1>
+{% endblock %}
+
+{% block extrastyle %}
+
+<style>
+
+    #header {
+        background-color: #1e1e2d;
+    }
+
+    #branding h1 {
+        color: white;
+        font-size: 1.5rem;
+        text-transform: capitalize;
+        font-weight: bold;
+    }
+
+    body {
+        background-color: #3b3b4c;
+    }
+
+    #content h1 {
+        color: white;
+    }
+
+    .module h2, .module caption, .inline-group h2 {
+        background: #9C9CB1;
+    }
+
+    #nav-sidebar .current-model {
+        background: #D5D5DD;
+        color: white;
+    }
+
+    div.breadcrumbs {
+        background: #775773;
+        color: white;
+    }
+
+</style>
+
+{% endblock %}

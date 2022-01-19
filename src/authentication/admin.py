@@ -70,13 +70,15 @@ class UserAdmin(BaseUserAdmin):
     # that reference specific fields on auth.User.
     list_display = ('email', 'first_name', 'last_name', 'is_sales',
                     'is_support', 'is_management', 'is_staff', 'is_admin')
+    list_editable = ('is_sales', 'is_support', 'is_management', 'is_staff', 'is_admin')
+
     list_filter = ('email', 'first_name', 'last_name', 'is_sales',
                    'is_support', 'is_management', 'is_staff', 'is_admin')
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
         ('Personal info', {'fields': ('first_name', 'last_name')}),
-        ('Permissions', {'fields': ( 'is_sales', 'is_support', 'is_management',
-                                     'is_staff', 'is_admin',)}),
+        ('Permissions', {'fields': ('is_sales', 'is_support', 'is_management',
+                                    'is_staff', 'is_admin',)}),
     )
     # add_fieldsets is not a standard ModelAdmin attribute. UserAdmin
     # overrides get_fieldsets to use this attribute when creating a user.
@@ -96,4 +98,3 @@ admin.site.register(Users, UserAdmin)
 # ... and, since we're not using Django's built-in permissions,
 # unregister the Group model from admin.
 admin.site.unregister(Group)
-
