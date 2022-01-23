@@ -74,6 +74,9 @@ class UserAdmin(BaseUserAdmin):
 
     list_filter = ('email', 'first_name', 'last_name', 'is_sales',
                    'is_support', 'is_management', 'is_staff', 'is_admin')
+
+    # le fieldset crée des sous menu :
+    # https://docs.djangoproject.com/fr/4.0/intro/tutorial07/
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
         ('Personal info', {'fields': ('first_name', 'last_name')}),
@@ -92,9 +95,44 @@ class UserAdmin(BaseUserAdmin):
     ordering = ('email',)
     filter_horizontal = ()
 
+    def has_view_permission(self, request):
+        if request.user.is_admin:
+            return True
+        if request.user.is_management:
+            return True
+        return False
 
+    # Si seulement has_view, les users restes visibles car supposés
+    # modifiables et autres
+
+    def has_add_permission(self, request):
+        if request.user.is_admin:
+            return True
+        if request.user.is_management:
+            return True
+        return False
+
+    def has_change_permission(self, request):
+        if request.user.is_admin:
+            return True
+        if request.user.is_management:
+            return True
+        return False
+
+    def has_delete_permission(self, request):
+        if request.user.is_admin:
+            return True
+        if request.user.is_management:
+            return True
+        return False
+
+
+# admin.site.register permt de remplacer un modèle (et ses champs) par un autre
+# pour le gestionnaire d'administration au lieu d'utiliser le décorateur @admin.register(***):
+# https://docs.djangoproject.com/fr/4.0/intro/tutorial07/
 # Now register the new UserAdmin...
 admin.site.register(Users, UserAdmin)
 # ... and, since we're not using Django's built-in permissions,
-# unregister the Group model from admin.
+# GROUP : Pour ne pas afficher group dans Admin (unregister the Group model from admin) :
 admin.site.unregister(Group)
+
