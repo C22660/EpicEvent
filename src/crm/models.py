@@ -54,7 +54,7 @@ class Contracts(models.Model):
         verbose_name = "Contrat"
 
     def __str__(self):
-        return str(self.id)
+        return '%s, contrat numéro %s' % (self.client.compagny_name, self.id)
 
 
 class EventStatus(models.Model):
@@ -91,3 +91,6 @@ class Events(models.Model):
 
     class Meta:
         verbose_name = "Evènement"
+
+    def __str__(self):
+        return '%s, évènement numéro %s' % (self.client.compagny_name, self.id)

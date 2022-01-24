@@ -9,7 +9,6 @@ class ClientsAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_admin:
-            print(qs)
             return qs
         if request.user.is_management:
             return qs
@@ -31,30 +30,114 @@ class ClientsAdmin(admin.ModelAdmin):
             return True
         return False
 
-    def has_change_permission(self, request):
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_admin:
+            return True
+        if request.user.is_sales:
+            return True
+        if request.user.is_management:
+            return True
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         if request.user.is_admin:
             return True
         if request.user.is_sales:
             return True
         return False
-
-    def has_delete_permission(self, request):
-        if request.user.is_admin:
-            return True
-        if request.user.is_sales:
-            return True
-        return False
-
-@admin.register(Events)
-class EventsAdmin(admin.ModelAdmin):
-    pass
 
 
 @admin.register(Contracts)
 class ContractsAdmin(admin.ModelAdmin):
-    pass
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_admin:
+            return qs
+        if request.user.is_management:
+            return qs
+        return qs.filter(sales_contact=request.user)
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_support:
+            return False
+        return True
+
+    def has_add_permission(self, request):
+        if request.user.is_admin:
+            return True
+        if request.user.is_sales:
+            return True
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_admin:
+            return True
+        if request.user.is_sales:
+            return True
+        if request.user.is_management:
+            return True
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_admin:
+            return True
+        if request.user.is_sales:
+            return True
+        return False
+
+
+@admin.register(Events)
+class EventsAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_admin:
+            return qs
+        if request.user.is_management:
+            return qs
+        if request.user.is_sales:
+            events = Events.objects.filter(client__sales_contact=request.user)
+            return events
+        return qs.filter(support_contact=request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return True
+
+    def has_add_permission(self, request):
+        if request.user.is_admin:
+            return True
+        if request.user.is_sales:
+            return True
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_admin:
+            return True
+        if request.user.is_sales:
+            return True
+        return False
 
 
 @admin.register(EventStatus)
 class EventStatusAdmin(admin.ModelAdmin):
-    pass
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_admin:
+            return True
+        return False
+
+    def has_add_permission(self, request):
+        if request.user.is_admin:
+            return True
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_admin:
+            return True
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_admin:
+            return True
+        return False
